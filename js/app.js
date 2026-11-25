@@ -15,7 +15,7 @@ const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let modelsPromise;
 const S = {
   current: -1, busy: false, queue: null, running: false,
-  focus: -1, focusAmt: 0, yaw: 0, pitch: 0, velX: 0, velY: 0, dragging: false, hsShow: 0, hs: [],
+  focus: -1, focusAmt: 0, yaw: 0, pitch: 0, zoom: 1, velX: 0, velY: 0, dragging: false, hsShow: 0, hs: [],
   mouse: { x: 0, y: 0 }, sm: { x: 0, y: 0 },
 };
 
@@ -37,6 +37,108 @@ function fatal(e) {
   const f = $('#fatal');
   f.style.display = 'grid';
   f.innerHTML = `<div>Could not load <code>${CONFIG.modelSrc}</code>.<br>Open this folder through a local web server<br>(e.g. <code>npx serve</code> or <code>python -m http.server</code>) — browsers block 3D files on <code>file://</code>.</div>`;
+}
+
+/* ═══════════════════════ PRE-VIDEO PARALLAX ═══════════════════════ */
+let experienceStarted = false;
+function startExperienceFromScroll() {
+  if (experienceStarted) return;
+  experienceStarted = true;
+  const pv = $('#pinPreviewVideo');
+  if (pv) pv.pause();
+  document.body.classList.add('is-locked');
+  const pre = $('#preScroll');
+  if (pre) pre.style.display = 'none';
+  if (window.ScrollTrigger) window.ScrollTrigger.getAll().forEach((st) => st.kill());
+  runIntro();
+}
+
+function initPreScroll() {
+  if (window.lucide) window.lucide.createIcons();
+  const sp = $('#scrollPrompt');
+  if (sp) {
+    const hidePrompt = () => gsap.to(sp, { opacity: 0, y: 10, duration: 0.5, ease: 'power2.in', onComplete: () => { sp.style.display = 'none'; } });
+    const timer = setTimeout(hidePrompt, 4000);
+    addEventListener('scroll', () => { if (scrollY > 20) { clearTimeout(timer); hidePrompt(); } }, { once: true, passive: true });
+  }
+  const hb = $('#hamburgerBtn');
+  const mnav = $('#mobileNav');
+  const mclose = $('#mobileNavClose');
+  const setNav = (open) => {
+    if (!mnav) return;
+    mnav.classList.toggle('is-open', open);
+    mnav.setAttribute('aria-hidden', String(!open));
+    if (hb) hb.setAttribute('aria-expanded', String(open));
+  };
+  if (hb) hb.addEventListener('click', () => setNav(true));
+  if (mclose) mclose.addEventListener('click', () => setNav(false));
+  $$('#preScroll .nav-dropdown-toggle').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const dd = btn.closest('.nav-dropdown');
+      if (!dd) return;
+      if (btn.tagName === 'A' && innerWidth > 991) return;
+      e.preventDefault();
+      const wasOpen = dd.classList.contains('open');
+      $$('#preScroll .nav-dropdown').forEach((d) => d.classList.remove('open'));
+      if (!wasOpen) dd.classList.add('open');
+      btn.setAttribute('aria-expanded', String(!wasOpen));
+    });
+  });
+  const ST = window.ScrollTrigger;
+  if (!ST) { startExperienceFromScroll(); return; }
+  gsap.registerPlugin(ST);
+
+  const pv = $('#pinPreviewVideo');
+  if (pv) {
+    pv.src = CONFIG.introSrc;
+    pv.play().catch(() => {});
+  }
+
+  // Blog hero image & text parallax
+  gsap.to('.blog-hero-img', {
+    yPercent: 18,
+    ease: 'none',
+    scrollTrigger: { trigger: '.blog-hero-banner', start: 'top top', end: 'bottom top', scrub: true },
+  });
+  gsap.to('.blog-title', {
+    yPercent: -20,
+    opacity: 0.35,
+    ease: 'none',
+    scrollTrigger: { trigger: '.blog-hero-banner', start: 'top 10%', end: 'bottom top', scrub: true },
+  });
+  gsap.to('.blog-lead', {
+    yPercent: -10,
+    ease: 'none',
+    scrollTrigger: { trigger: '.blog-intro', start: 'top 60%', end: 'bottom top', scrub: true },
+  });
+  gsap.from('.blog-body', {
+    y: 40,
+    ease: 'none',
+    scrollTrigger: { trigger: '.blog-body', start: 'top bottom', end: 'top 55%', scrub: true },
+  });
+
+  // Video entry parallax as it scrolls into view
+  gsap.fromTo('#pinPreviewVideo', { yPercent: -16, scale: 1.18 }, {
+    yPercent: -6,
+    scale: 1.12,
+    ease: 'none',
+    scrollTrigger: { trigger: '#parallaxPin', start: 'top bottom', end: 'top top', scrub: true },
+  });
+
+  // Pinned video parallax before launching the full intro
+  const tl = gsap.timeline({
+    scrollTrigger: {
+      trigger: '#parallaxPin',
+      start: 'top top',
+      end: '+=100%',
+      pin: true,
+      pinSpacing: true,
+      scrub: 0.5,
+      onLeave: startExperienceFromScroll,
+    },
+  });
+  tl.fromTo('#pinPreviewVideo', { yPercent: -6, scale: 1.12 }, { yPercent: 0, scale: 1, ease: 'none' }, 0)
+    .to('.pin-watermark', { yPercent: -24, opacity: 0, ease: 'none' }, 0);
 }
 
 /* ═══════════════════════ INTRO VIDEO ═══════════════════════ */
@@ -412,6 +514,13 @@ function bindPointer(canvas) {
   });
   const up = () => { S.dragging = false; };
   canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+  canvas.addEventListener('wheel', (e) => {
+    if (!S.running || S.focus >= 0) return;
+    e.preventDefault();
+    S.zoom = clamp(S.zoom - e.deltaY * 0.0012, 0.75, 2.2);
+    if (Math.abs(S.zoom - 1) > 0.05) $('#resetView').classList.add('show');
+    else if (S.focus < 0 && Math.abs(S.yaw) <= 0.08 && Math.abs(S.pitch) <= 0.08) $('#resetView').classList.remove('show');
+  }, { passive: false });
   addEventListener('keydown', (e) => {
     if (!S.running) return;
     if (e.key === 'ArrowRight') goTo((S.current + 1) % DESIGNS.length);
@@ -432,7 +541,7 @@ function tick() {
   }
   const idle = (1 - S.focusAmt) * (REDUCE ? 0.25 : 1);
   stage.position.set(L.x, L.y + Math.sin(t * 0.9) * 0.05 * idle, 0);
-  stage.scale.setScalar(L.scale);
+  stage.scale.setScalar(L.scale * (S.focus < 0 ? S.zoom : 1));
   stage.rotation.y = (Math.sin(t * 0.5) * 0.3 + S.sm.x * 0.32) * idle + S.yaw;
   stage.rotation.x = (-S.sm.y * 0.1 + Math.sin(t * 0.7) * 0.03) * idle + S.pitch;
   mouseLight.position.set(L.x + S.sm.x * 5, -S.sm.y * 3.2 + L.y, 4);
@@ -599,7 +708,7 @@ function focusFeature(k) {
 }
 
 function unfocus(instant) {
-  const rotated = Math.abs(S.yaw) > 0.01 || Math.abs(S.pitch) > 0.01;
+  const rotated = Math.abs(S.yaw) > 0.01 || Math.abs(S.pitch) > 0.01 || Math.abs(S.zoom - 1) > 0.01;
   if (S.focus < 0 && !rotated && !instant) return;
   S.focus = -1;
   const dur = instant ? 0 : 1.1;
@@ -610,7 +719,7 @@ function unfocus(instant) {
   gsap.to(inner.position, { x: 0, y: 0, z: 0, duration: dur, ease: 'power3.inOut', overwrite: true });
   S.yaw = ((S.yaw + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
   S.velX = 0; S.velY = 0;
-  gsap.to(S, { focusAmt: 0, yaw: 0, pitch: 0, duration: dur });
+  gsap.to(S, { focusAmt: 0, yaw: 0, pitch: 0, zoom: 1, duration: dur });
 }
 $('#resetView').addEventListener('click', () => unfocus());
 
@@ -632,9 +741,11 @@ $('#shop').addEventListener('click', (e) => {
 
 
 if (params.has('skip')) {
+  document.body.classList.add('is-locked');
+  if ($('#preScroll')) $('#preScroll').style.display = 'none';
   gsap.set('#headerLogo', { opacity: 1 });
   enterMain();
 } else {
-  runIntro();
+  initPreScroll();
 }
 

@@ -6,13 +6,13 @@ export const CONFIG = {
   introSeconds: 0,                   // 0 = play full video; >0 = hard cap in seconds
   introMuted: true,                  // browsers block autoplay with sound; user can unmute via the Sound button
   outroSrc: 'video/video_outro.mp4',
-  outroMuted: false,                 // triggered by user click on Shop Now, so sound can play by default
-  defaultShopUrl: 'https://www.tanishq.co.in', // fallback URL when a design's shopUrl is '#'
+  outroMuted: false,                 // triggered by user click on Contact Us, so sound can play by default
+  defaultShopUrl: 'https://www.adomantra.com/', // fallback URL when a design's shopUrl is '#'
   logoSrc: 'assets/tanishq-logo.png',
   modelSrc: 'assets/designs.glb',
   brandTag: 'A TATA PRODUCT',
   logoTagline: 'Singular brilliance, infinite charm',
-  shopLabel: 'SHOP NOW',
+  shopLabel: 'CONTACT US',
   modelHeight: 3.4,                  // world units of the tallest design
   modelYaw: -Math.PI / 2,            // which face of the flat GLB looks at camera (diamond-set side)
   focusZoom: 1.9,                    // zoom when a feature is clicked
