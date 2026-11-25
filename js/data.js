@@ -7,7 +7,7 @@ export const CONFIG = {
   introMuted: true,                  // browsers block autoplay with sound; user can unmute via the Sound button
   outroSrc: 'video/video_outro.mp4',
   outroMuted: false,                 // triggered by user click on Contact Us, so sound can play by default
-  defaultShopUrl: 'https://www.adomantra.com/', // fallback URL when a design's shopUrl is '#'
+  defaultShopUrl: 'https://www.tanishq.co.in', // fallback URL when a design's shopUrl is '#'
   logoSrc: 'assets/tanishq-logo.png',
   modelSrc: 'assets/designs.glb',
   brandTag: 'A TATA PRODUCT',
